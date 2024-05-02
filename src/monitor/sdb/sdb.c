@@ -49,6 +49,7 @@ static int cmd_c(char *args) {
 
 
 static int cmd_q(char *args) {
+  nemu_state.state = NEMU_QUIT;
   return -1;
 }
 
@@ -67,10 +68,9 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
 
   /* TODO: Add more commands */
-  {"si", "Single step. When N is not specified, the default is 1.", cmd_si},
+  {"si", "Single step. When N is not specified, the default is 1.", cmd_si },
   /* TODO: Add clear commands */
-  {"clear", "Clear all display on the current terminal screen.", 
-          cmd_clear},
+  {"clear", "Clear all display on the current terminal screen.", cmd_clear },
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -98,25 +98,18 @@ static int cmd_help(char *args) {
   return 0;
 }
 
-/* TODO: Function cmd_si */
 static int cmd_si(char *args){
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
   uint64_t N=1;
-  if (arg == NULL) {
-    /* no argument given */
-    printf("default arg is %ld %ld", N, 0x7fffffffffffffff);
-  }
-  else {
+  if (arg != NULL) {
     N=atol(arg);
     if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
-      printf("Argument is %ld, it is not valid for input <= 0 || input >= 0x7fffffffffffffff || input is char.\n", (int64_t)N);
-    }
-    else {
-      printf("Argument is %ld\n", N);
+      printf("Argument %s is not valid: Maybe it's  <= 0, too big, or a character...\n", arg);
+      return 1;
     }
   }
-
+  cpu_exec(N);
   return 0;
 }
 
