@@ -55,6 +55,7 @@ static int cmd_q(char *args) {
 static int cmd_help(char *args);
 
 static int cmd_si(char *args);
+static int cmd_clear(char *args);
 
 static struct {
   const char *name;
@@ -66,8 +67,10 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
 
   /* TODO: Add more commands */
-  {"si", "Single step. When N is not specified, the default is 1.", cmd_si}
+  {"si", "Single step. When N is not specified, the default is 1.", cmd_si},
   /* TODO: Add clear commands */
+  {"clear", "Clear all display on the current terminal screen.", 
+          cmd_clear},
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -116,6 +119,12 @@ static int cmd_si(char *args){
 
   return 0;
 }
+
+static int cmd_clear(char *args){
+  printf("\033[H\033[2J");
+  return 0;
+}
+
 void sdb_set_batch_mode() {
   is_batch_mode = true;
 }
