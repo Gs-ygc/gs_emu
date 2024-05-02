@@ -24,8 +24,27 @@ const char *regs[] = {
 };
 
 void isa_reg_display() {
+  int len=ARRLEN(regs);
+  printf("%-4s    0x%08lx    %010ld\n", "pc", cpu.pc, cpu.pc);
+  for (int i=0; i<len; i++) {
+  printf("%-4s    0x%08lx    %010ld\n", reg_name(i), cpu.gpr[i], cpu.gpr[i]);
+  }
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
-  return 0;
+  int len=ARRLEN(regs);
+  unsigned int i=0;
+
+  if (!strcmp("pc",s)) {
+    *success=true;
+    return cpu.pc;
+  }
+  for (; i<len && !!strcmp(reg_name(i++),s);) {;}
+  if(i>=len){
+    *success=false;
+    return -1;
+  }else{
+    *success=true;
+    return cpu.gpr[i-1];
+  }
 }
