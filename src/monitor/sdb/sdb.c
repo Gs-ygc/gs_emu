@@ -54,6 +54,8 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si(char *args);
+
 static struct {
   const char *name;
   const char *description;
@@ -64,7 +66,8 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
 
   /* TODO: Add more commands */
-
+  {"si", "Single step. When N is not specified, the default is 1.", cmd_si}
+  /* TODO: Add clear commands */
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -92,6 +95,27 @@ static int cmd_help(char *args) {
   return 0;
 }
 
+/* TODO: Function cmd_si */
+static int cmd_si(char *args){
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  uint64_t N=1;
+  if (arg == NULL) {
+    /* no argument given */
+    printf("default arg is %ld %ld", N, 0x7fffffffffffffff);
+  }
+  else {
+    N=atol(arg);
+    if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
+      printf("Argument is %ld, it is not valid for input <= 0 || input >= 0x7fffffffffffffff || input is char.\n", (int64_t)N);
+    }
+    else {
+      printf("Argument is %ld\n", N);
+    }
+  }
+
+  return 0;
+}
 void sdb_set_batch_mode() {
   is_batch_mode = true;
 }
