@@ -17,6 +17,7 @@
 #include <cpu/cpu.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <memory/vaddr.h>
 #include "sdb.h"
 
 static int is_batch_mode = false;
@@ -54,10 +55,10 @@ static int cmd_q(char *args) {
 }
 
 static int cmd_help(char *args);
-
 static int cmd_si(char *args);
 static int cmd_clear(char *args);
 static int cmd_info(char *args);
+static int cmd_x(char *args);
 
 static struct {
   const char *name;
@@ -69,7 +70,8 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
   {"si", "Single step. When N is not specified, the default is 1.", cmd_si },
   {"clear", "Clear all display on the current terminal screen.", cmd_clear },
-  {"info", "info test", cmd_info },
+  {"info", "Generic command for showing things about the program being debugged", cmd_info },
+  {"x","Examine memory: x/FMT ADDRESS.ADDRESS is an expression for the memory address to examine.",cmd_x},
     /* TODO: Add more commands */
 };
 
@@ -101,7 +103,7 @@ static int cmd_help(char *args) {
 static int cmd_si(char *args){
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
-  uint64_t N=1;
+  word_t N=1;
   if (arg != NULL) {
     N=atol(arg);
     if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
@@ -141,6 +143,39 @@ static int cmd_info(char *args){
   }
   printf("print all reg info\n");
   isa_reg_display();
+  return 0;
+}
+
+static int cmd_x(char *args){
+  word_t N=0;
+  word_t EXPR=0;
+  char *arg = strtok(NULL, " ");
+  bool SUCCESS=false;
+
+  if (arg != NULL) {
+    N=atol(arg);
+    if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
+      printf("Argument %s is not valid: Maybe it's  <= 0, too big, or a character...\n", arg);
+      return 1;
+    }else if( (arg = strtok(NULL, " ") ) != NULL ){
+      EXPR=expr(arg,&SUCCESS);
+      if (!SUCCESS) {
+        printf("EXPR is ERROR\n");
+        return 1;
+      }
+    }else {
+      EXPR=0;
+      printf("EXPR is empty\n");
+      return 1;
+    }
+  }
+  for (int i=0; i<N; i++) {
+    // vaddr_t tmp=vaddr_read(EXPR+4*i,4);
+    printf("0x%08lx :   0x%02lx    0x%02lx    0x%02lx    0x%02lx\n",EXPR+4*i,
+                  vaddr_read(EXPR+4*i+3,1),vaddr_read(EXPR+4*i+2,1),
+                  vaddr_read(EXPR+4*i+1,1),vaddr_read(EXPR+4*i+0,1)
+                  );
+  }
   return 0;
 }
 
