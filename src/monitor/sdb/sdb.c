@@ -34,7 +34,7 @@ static char* rl_gets() {
     line_read = NULL;
   }
 
-  line_read = readline("(nemu) ");
+  line_read = readline("(gemu) ");
 
   if (line_read && *line_read) {
     add_history(line_read);
@@ -59,6 +59,7 @@ static int cmd_si(char *args);
 static int cmd_clear(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
+static int cmd_exp(char *args);
 
 static struct {
   const char *name;
@@ -72,6 +73,7 @@ static struct {
   {"clear", "Clear all display on the current terminal screen.", cmd_clear },
   {"info", "Generic command for showing things about the program being debugged", cmd_info },
   {"x","Examine memory: x/FMT ADDRESS.ADDRESS is an expression for the memory address to examine.",cmd_x},
+  {"p","Print value of expression EXP",cmd_exp},
     /* TODO: Add more commands */
 };
 
@@ -157,7 +159,7 @@ static int cmd_x(char *args){
     if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
       printf("Argument %s is not valid: Maybe it's  <= 0, too big, or a character...\n", arg);
       return 1;
-    }else if( (arg = strtok(NULL, " ") ) != NULL ){
+    }else if( (arg = strtok(NULL, "\n") ) != NULL ){
       EXPR=expr(arg,&SUCCESS);
       if (!SUCCESS) {
         printf("EXPR is ERROR\n");
@@ -176,6 +178,26 @@ static int cmd_x(char *args){
                   vaddr_read(EXPR+4*i+1,1),vaddr_read(EXPR+4*i+0,1)
                   );
   }
+  return 0;
+}
+
+static int cmd_exp(char *args){
+  char *arg = strtok(NULL, "\n");
+  word_t EXPR=0;
+  bool SUCCESS=false;
+
+  if (arg!=NULL){
+      EXPR=expr(arg,&SUCCESS);
+      if (!SUCCESS) {
+        printf("EXPR is ERROR\n");
+        return 1;
+      }
+  }else {
+      EXPR=0;
+      printf("EXPR is empty\n");
+      return 1;
+  }
+  printf("0x%08lx    %ld\n",EXPR,EXPR);
   return 0;
 }
 
