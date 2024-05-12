@@ -59,3 +59,5 @@ else
 # Include rules to build NEMU
 include $(NEMU_HOME)/scripts/native.mk
 endif
+# Include rules for tools
+include $(NEMU_HOME)/scripts/tools.mk
