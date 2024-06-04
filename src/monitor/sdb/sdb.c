@@ -18,10 +18,13 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <memory/vaddr.h>
+#include "isa-def.h"
+#include "macro.h"
+#include "utils.h"
 #include "sdb.h"
 
 static int is_batch_mode = false;
-
+extern privilege cur_pri;
 void init_regex();
 void init_wp_pool();
 
@@ -44,7 +47,25 @@ static char* rl_gets() {
 }
 
 static int cmd_c(char *args) {
-  cpu_exec(-1);
+  if(is_batch_mode){ cpu_exec(-1); return 0; }
+  char *arg = strtok(NULL, "\n");
+  word_t EXPR=0;
+  bool SUCCESS=false;
+
+  if (arg!=NULL){
+      EXPR=expr(arg,&SUCCESS);
+      if (!SUCCESS) {
+        printf("EXPR is ERROR\n");
+        return 1;
+      }
+  }else {
+      EXPR=0;
+      cpu_exec(-1);
+      return 0;
+  }
+  while(cpu.pc!=EXPR && (nemu_state.state==NEMU_RUNNING || nemu_state.state==NEMU_STOP)){
+    cpu_exec(1);
+  }
   return 0;
 }
 
@@ -59,7 +80,7 @@ static int cmd_si(char *args);
 static int cmd_clear(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
-static int cmd_exp(char *args);
+static int cmd_exp(char *args);//TODO this have a little bug
 
 static struct {
   const char *name;
@@ -74,7 +95,7 @@ static struct {
   {"info", "Generic command for showing things about the program being debugged", cmd_info },
   {"x","Examine memory: x/FMT ADDRESS.ADDRESS is an expression for the memory address to examine.",cmd_x},
   {"p","Print value of expression EXP",cmd_exp},
-    /* TODO: Add more commands */
+    /* TODO: 观测点 Add more commands */
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -131,15 +152,18 @@ static int cmd_info(char *args){
       arg = strtok(NULL, " ");
       if (arg!=NULL ) {
         word_t val=isa_reg_str2val(arg,&success);
-        if(success) printf("%-4s    0x%08lx    %010ld\n", arg, val, val);
+        if(success) printf("%-4s    "FMT_WORD"    %010d\n", arg, val, val);
         else        printf("Invalid register `%s'\n",arg);
         return 0;
       }
-    }else if (strcmp(arg,"all-registers")) {
-      printf("Unknown Argument:%s \n",arg);
-      return 1;
-    }else if (strcmp(arg,"w")) {
+    }else if (!strcmp(arg,"all-registers")) {
+      isa_reg_display();
+      return 0;
+    }else if (!strcmp(arg,"w")) {
       printf("print watch point\n");
+      return 0;
+    }else if (!strcmp(arg,"p")) {
+      printf("mode is %d\n",cur_pri);
       return 0;
     }
   }
@@ -149,14 +173,15 @@ static int cmd_info(char *args){
 }
 
 static int cmd_x(char *args){
-  word_t N=0;
+  word_t N=1;
   word_t EXPR=0;
   char *arg = strtok(NULL, " ");
   bool SUCCESS=false;
 
   if (arg != NULL) {
     N=atol(arg);
-    if ((int64_t)N<=0||N>=0x7fffffffffffffff) {
+    int64_t tmp=(int64_t) N;
+    if (tmp<=0||tmp>=0x7fffffffffffffff) {
       printf("Argument %s is not valid: Maybe it's  <= 0, too big, or a character...\n", arg);
       return 1;
     }else if( (arg = strtok(NULL, "\n") ) != NULL ){
@@ -173,7 +198,7 @@ static int cmd_x(char *args){
   }
   for (int i=0; i<N; i++) {
     // vaddr_t tmp=vaddr_read(EXPR+4*i,4);
-    printf("0x%08lx :   0x%02lx    0x%02lx    0x%02lx    0x%02lx\n",EXPR+4*i,
+    printf(""FMT_WORD" :   0x%02x    0x%02x    0x%02x    0x%02x\n",EXPR+4*i,
                   vaddr_read(EXPR+4*i+3,1),vaddr_read(EXPR+4*i+2,1),
                   vaddr_read(EXPR+4*i+1,1),vaddr_read(EXPR+4*i+0,1)
                   );
@@ -197,7 +222,7 @@ static int cmd_exp(char *args){
       printf("EXPR is empty\n");
       return 1;
   }
-  printf("0x%08lx    %ld\n",EXPR,EXPR);
+  printf(""FMT_WORD"    %d\n",EXPR,EXPR);
   return 0;
 }
 

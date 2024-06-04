@@ -15,6 +15,9 @@
 
 #include <isa.h>
 #include <memory/paddr.h>
+#include <stdio.h>
+#include "common.h"
+#include "isa-def.h"
 
 void init_rand();
 void init_log(const char *log_file);
@@ -33,28 +36,50 @@ void sdb_set_batch_mode();
 static char *log_file = NULL;
 static char *diff_so_file = NULL;
 static char *img_file = NULL;
+static char *bios_file = NULL;
+static char *kernel_file = NULL;
+static char *dtb_file = NULL;
+
 static int difftest_port = 1234;
+extern privilege cur_pri;
 
-static long load_img() {
-  if (img_file == NULL) {
-    Log("No image is given. Use the default build-in image.");
-    return 4096; // built-in image size
+static long input_file_load(char * file_name, paddr_t paddr){
+  FILE *fp = NULL;
+  unsigned int size=0;
+
+  if (file_name!=NULL) {
+    fp = fopen(file_name, "rb");
+    Assert(fp, "Can not open '%s'", file_name);
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    Log("The image is %s, size = %d mmap  at ["FMT_PADDR", "FMT_PADDR"]", file_name, size,paddr,paddr+size);
+    fseek(fp, 0, SEEK_SET);
+    int ret = fread(guest_to_host(paddr), size, 1, fp);
+    assert(ret == 1);
+    fclose(fp);
   }
-
-  FILE *fp = fopen(img_file, "rb");
-  Assert(fp, "Can not open '%s'", img_file);
-
-  fseek(fp, 0, SEEK_END);
-  long size = ftell(fp);
-
-  Log("The image is %s, size = %ld", img_file, size);
-
-  fseek(fp, 0, SEEK_SET);
-  int ret = fread(guest_to_host(RESET_VECTOR), size, 1, fp);
-  assert(ret == 1);
-
-  fclose(fp);
   return size;
+}
+static long load_img() {
+  long total_size=0;
+  if(img_file == NULL && bios_file ==NULL && dtb_file==NULL && kernel_file == NULL){
+    Log("no image no bios no kernel from built in image boot");
+    return 4096;
+  }
+  if(img_file != NULL)
+    total_size += input_file_load(img_file,RESET_VECTOR);
+  if(bios_file != NULL)
+    total_size += input_file_load(bios_file,RESET_VECTOR+total_size);
+
+  if (kernel_file!=NULL) 
+    total_size += input_file_load(kernel_file,PMEM_KERNEL);
+
+  if(total_size==0) {Log("no image no bios no kernel from built in image boot");return 4096;}
+
+  if (dtb_file!=NULL) 
+    total_size += input_file_load(dtb_file,PMEM_DTB);
+
+  return total_size;
 }
 
 static int parse_args(int argc, char *argv[]) {
@@ -63,6 +88,10 @@ static int parse_args(int argc, char *argv[]) {
     {"log"      , required_argument, NULL, 'l'},
     {"diff"     , required_argument, NULL, 'd'},
     {"port"     , required_argument, NULL, 'p'},
+    {"mode"     , required_argument, NULL, 'm'},
+    {"bios"     , required_argument, NULL, 'i'},  // 新增的--bios选项
+    {"kernel"   , required_argument, NULL, 'k'},  // 新增的--kernel选项
+    {"dtb"      , required_argument, NULL, 't'},  // 新增的--dtb选项
     {"help"     , no_argument      , NULL, 'h'},
     {0          , 0                , NULL,  0 },
   };
@@ -71,8 +100,12 @@ static int parse_args(int argc, char *argv[]) {
     switch (o) {
       case 'b': sdb_set_batch_mode(); break;
       case 'p': sscanf(optarg, "%d", &difftest_port); break;
+      case 'm': sscanf(optarg, "%d", &cur_pri); break;
       case 'l': log_file = optarg; break;
       case 'd': diff_so_file = optarg; break;
+      case 'i': bios_file = optarg; break;  // 处理--bios选项
+      case 'k': kernel_file = optarg; break;  // 处理--kernel选项
+      case 't': dtb_file = optarg; break;  // 处理--kernel选项
       case 1: img_file = optarg; return 0;
       default:
         printf("Usage: %s [OPTION...] IMAGE [args]\n\n", argv[0]);
@@ -80,6 +113,7 @@ static int parse_args(int argc, char *argv[]) {
         printf("\t-l,--log=FILE           output log to FILE\n");
         printf("\t-d,--diff=REF_SO        run DiffTest with reference REF_SO\n");
         printf("\t-p,--port=PORT          run DiffTest with port PORT\n");
+        printf("\t-m,--mode=mode          run mode MSU: 0/1/3\n");
         printf("\n");
         exit(0);
     }
@@ -91,6 +125,7 @@ void init_monitor(int argc, char *argv[]) {
   /* Perform some global initialization. */
 
   /* Parse arguments. */
+  if( freopen("/dev/pts/3", "w", stderr)==NULL ){assert(-1);};
   parse_args(argc, argv);
 
   /* Set random seed. */

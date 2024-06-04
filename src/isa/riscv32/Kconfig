@@ -7,4 +7,51 @@ config RV64
 config RVE
   bool "Use E extension"
   default n
+
+config RVC
+  bool "Use C extension"
+  default n
+
+config RVA
+  bool "Use A extension"
+  default y
+
+config RVF
+  bool "Use F extension"
+  default n
+
+config RVD
+  bool "Use D extension"
+  default n
+
+config RVZicsr
+  bool "Use Zicsr extension"
+  default y
+
+config RVZifencei
+  bool "Use Zifencei extension"
+  default y
+
+config RVMemMisalignAccess
+  bool "Use Mem Misaligned Access"
+  default y
+
+choice
+  prompt "RISC-V privilege modes supported [default MSU]"
+  default RVPrivMSU
+config RVPrivM
+  bool "M"
+config RVPrivMU
+  bool "MU"
+config RVPrivMSU
+  bool "MSU"
+endchoice
+
+config RVPriv
+  string
+  default "M" if RVPrivM
+  default "MU" if RVPrivMU
+  default "MSU" if RVPrivMSU
+  default "MSU"
+
 endmenu

@@ -35,9 +35,16 @@ static debug_module_config_t difftest_dm_config = {
   .support_haltgroups = true,
   .support_impebreak = true
 };
+typedef struct Node {
+    word_t mem_word;
+    bool reserved;
+    struct Node* next_node;
+} atomic_mem_word;
 
 struct diff_context_t {
   word_t gpr[MUXDEF(CONFIG_RVE, 16, 32)];
+  word_t csr[64];
+  atomic_mem_word *amw;
   word_t pc;
 };
 
@@ -60,6 +67,20 @@ void sim_t::diff_get_regs(void* diff_context) {
     ctx->gpr[i] = state->XPR[i];
   }
   ctx->pc = state->pc;
+  // CSR_GET
+  int i=0;
+  
+  #ifdef CONFIG_RVZicsr
+  #include "../../src/isa/riscv64/local-include/csr.h"
+
+  word_t csr_idx_map[]={CSR_IDX_MAP_DEFINE_LIST};
+
+  for(int idx=0;idx<sizeof(csr_idx_map)/sizeof(csr_idx_map[0]);idx++){
+    // printf("0x%04x\n",csr_idx_map[idx]);
+    ctx->csr[idx] = state->csrmap[csr_idx_map[idx]]->read();
+  }
+  #endif
+
 }
 
 void sim_t::diff_set_regs(void* diff_context) {
@@ -101,13 +122,13 @@ __EXPORT void difftest_exec(uint64_t n) {
 
 __EXPORT void difftest_init(int port) {
   difftest_htif_args.push_back("");
-  const char *isa = "RV" MUXDEF(CONFIG_RV64, "64", "32") MUXDEF(CONFIG_RVE, "E", "I") "MAFDC";
+  const char *isa = "RV" MUXDEF(CONFIG_RV64, "64", "32") MUXDEF(CONFIG_RVE, "E", "I") "MA";//默认"MAFDC" 禁用FDC拓展为"MA"
   cfg_t cfg(/*default_initrd_bounds=*/std::make_pair((reg_t)0, (reg_t)0),
             /*default_bootargs=*/nullptr,
             /*default_isa=*/isa,
-            /*default_priv=*/DEFAULT_PRIV,
+            /*default_priv=*/CONFIG_RVPriv,
             /*default_varch=*/DEFAULT_VARCH,
-            /*default_misaligned=*/false,
+            /*default_misaligned=*/true,
             /*default_endianness*/endianness_little,
             /*default_pmpregions=*/16,
             /*default_mem_layout=*/std::vector<mem_cfg_t>(),

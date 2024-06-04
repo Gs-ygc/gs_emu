@@ -17,11 +17,22 @@
 #define __ISA_RISCV_H__
 
 #include <common.h>
+#include "atomic_mem_word.h"
 
+#ifdef CONFIG_HAS_SYSCON
+#define MSIP       0x0000
+#define MTIMECMPLO 0x4000
+#define MTIMECMPHI 0x4004
+#define MTIMELO    0xBFF8
+#define MTIMEHI    0xBFFC
+#endif
 typedef struct {
   word_t gpr[MUXDEF(CONFIG_RVE, 16, 32)];
+  word_t csr[64];
+  atomic_mem_word *amw;
   vaddr_t pc;
 } MUXDEF(CONFIG_RV64, riscv64_CPU_state, riscv32_CPU_state);
+
 
 // decode
 typedef struct {
@@ -31,5 +42,13 @@ typedef struct {
 } MUXDEF(CONFIG_RV64, riscv64_ISADecodeInfo, riscv32_ISADecodeInfo);
 
 #define isa_mmu_check(vaddr, len, type) (MMU_DIRECT)
+#define XLEN (MUXDEF(CONFIG_RV64, 64, 32))
+/* Privilege modes */
+#define PRV_U 0
+#define PRV_S 1
+#define PRV_RESERVED 2
+#define PRV_M 3
+
+typedef word_t privilege ;
 
 #endif

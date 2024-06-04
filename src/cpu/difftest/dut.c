@@ -18,6 +18,11 @@
 #include <isa.h>
 #include <cpu/cpu.h>
 #include <memory/paddr.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <utils.h>
 #include <difftest-def.h>
 
@@ -30,10 +35,19 @@ void (*ref_difftest_raise_intr)(uint64_t NO) = NULL;
 
 static bool is_skip_ref = false;
 static int skip_dut_nr_inst = 0;
+static bool skip_dut_one_inst = false;
 
+void difftest_skip_ref_one(){
+  skip_dut_one_inst=true;
+}
 // this is used to let ref skip instructions which
 // can not produce consistent behavior with NEMU
 void difftest_skip_ref() {
+  #ifdef CONFIG_DIFFTEST_REF_MINIRV32I
+  is_skip_ref = false;
+  // printf("debug REF_MINIRV32I do not skip ref\n");
+  return ;
+  #endif
   is_skip_ref = true;
   // If such an instruction is one of the instruction packing in QEMU
   // (see below), we end the process of catching up with QEMU's pc to
@@ -87,8 +101,13 @@ void init_difftest(char *ref_so_file, long img_size, int port) {
       "If it is not necessary, you can turn it off in menuconfig.", ref_so_file);
 
   ref_difftest_init(port);
+#ifdef CONFIG_DIFFTEST_REF_MINIRV32I
+  ref_difftest_memcpy(RESET_VECTOR, guest_to_host(RESET_VECTOR), -1, DIFFTEST_TO_DUT);
+  ref_difftest_regcpy(&cpu, DIFFTEST_TO_DUT);
+#else
   ref_difftest_memcpy(RESET_VECTOR, guest_to_host(RESET_VECTOR), img_size, DIFFTEST_TO_REF);
   ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
+#endif
 }
 
 static void checkregs(CPU_state *ref, vaddr_t pc) {
@@ -101,7 +120,10 @@ static void checkregs(CPU_state *ref, vaddr_t pc) {
 
 void difftest_step(vaddr_t pc, vaddr_t npc) {
   CPU_state ref_r;
-
+  if(skip_dut_one_inst){
+    skip_dut_one_inst=false;
+    return ;
+  }
   if (skip_dut_nr_inst > 0) {
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
     if (ref_r.pc == npc) {
@@ -123,7 +145,42 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
   }
 
   ref_difftest_exec(1);
+
+  // printf("%p\n",guest_to_host(CONFIG_CLINT_MMIO));
+  uint64_t *tmp=(uint64_t *)malloc(sizeof(uint64_t));
+    ref_difftest_regcpy(tmp,DIFFTEST_TO_REF);
+    // printf("my tim %lx\n",*tmp);
+    paddr_write((CONFIG_CLINT_MMIO+MTIMELO),8,*tmp);
+    // printf("%x\n",paddr_read((CONFIG_CLINT_MMIO+MTIMELO),8));
+    free(tmp);
+    tmp=0;
   ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
+  // ref_difftest_raise_intr();
+  // TODO 中断difftest
+  //   if(cpu.gpr[2]!=0){
+  //     char *sp_buff=malloc(sizeof(char)*16*1024);
+  //     if(sp_buff!=0){
+  //       ref_difftest_memcpy(cpu.gpr[2],sp_buff,16*1024,DIFFTEST_TO_DUT);
+  //       if (memcmp(sp_buff, guest_to_host(cpu.gpr[2]), 16*1024) == 0) {
+  //         // printf("Memory blocks a and b are equal.\n");
+  //       } else {
+  //         printf("Memory blocks a and b are not equal.pc = 0x%08x\n",cpu.pc);
+  //         // if(cpu.pc>0x800ea100){
+  //         // for (int i=0; i<=32*4; i+=4) {
+  //         //   if(i%32==0) printf("\n");
+  //         //     uint32_t ir = *((uint32_t *)(&((uint8_t *)sp_buff)[i]));
+  //         //     printf("0x%08x  ",ir);
+  //         //   }
+  //         // }
+  //         // free(sp_buff);
+  //         // exit(-1);
+  //       }
+  //     }else {
+  //       printf("sp buff malloc error");
+  //     }
+  //     free(sp_buff);
+  //     sp_buff=NULL;
+  // }
 
   checkregs(&ref_r, pc);
 }

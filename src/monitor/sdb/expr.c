@@ -45,6 +45,7 @@ static struct rule {
     {"\\(", '('},
     {"\\)", ')'},
     {"==", TK_EQ},  // equal
+    // TODO 增加为运算与关系运算
     {"0x[0-9A-Fa-f]+", TK_HEX},
     {"\\b[0-9]+\\b", TK_DECIMAL},
     {"\\$[0-9a-zA-Z]+", TK_REG},
@@ -186,6 +187,7 @@ word_t calculate(char c, word_t a, word_t b) {
       tmp = a * b;
       break;
     case '/':
+      Assert(b!=0, "Arithmetic Exception! \"%d / %d\" ",a,b);
       tmp = a / b;
       break;
   }
@@ -255,23 +257,24 @@ word_t tokens_calculation(bool *success) {
       }
       case '*': {
         if (i == 0 || is_not_num(tokens[i - 1].type)) {
-          printf("单目引用");
           op_stack[op_stack_top++] = '#';
           break;
         }
       }
       case '/': {
-        while (op_stack[op_stack_top - 1] == '*' ||
-               op_stack[op_stack_top - 1] == '/' ||
-               op_stack[op_stack_top - 1] == '#') {
-          if (op_stack[op_stack_top - 1] == '#') {
-            result = vaddr_read(num_stack[num_stack_top - 1], 4);
-          } else {
-            word_t a = num_stack[--num_stack_top];
-            word_t b = num_stack[--num_stack_top];
-            result = calculate(op_stack[--op_stack_top], b, a);
+        if (op_stack_top>0) {
+          while (op_stack[op_stack_top - 1] == '*' ||
+                op_stack[op_stack_top - 1] == '/' ||
+                op_stack[op_stack_top - 1] == '#') {
+            if (op_stack[op_stack_top - 1] == '#') {
+              result = vaddr_read(num_stack[num_stack_top - 1], 4);
+            } else {
+              word_t a = num_stack[--num_stack_top];
+              word_t b = num_stack[--num_stack_top];
+              result = calculate(op_stack[--op_stack_top], b, a);
+            }
+            num_stack[num_stack_top++] = result;
           }
-          num_stack[num_stack_top++] = result;
         }
         op_stack[op_stack_top++] = tokens[i].type;
         break;
@@ -287,7 +290,9 @@ word_t tokens_calculation(bool *success) {
         while (op_stack[op_stack_top - 1] == '*' ||
                op_stack[op_stack_top - 1] == '/') {
           if (op_stack[op_stack_top - 1] == '#') {
-            result = vaddr_read(num_stack[num_stack_top - 1], 4);
+            Assert(num_stack[num_stack_top-1]!=0, "Attempted to dereference a null pointer.");
+            result = vaddr_read(num_stack[--num_stack_top], 4);
+            op_stack_top--;
           } else {
             word_t a = num_stack[--num_stack_top];
             word_t b = num_stack[--num_stack_top];
@@ -300,10 +305,12 @@ word_t tokens_calculation(bool *success) {
     }
   }
 
-  while (op_stack_top > 0&&num_stack_top>1) {
+  while (op_stack_top > 0&&num_stack_top>0) {
     if (op_stack_top>0&&op_stack[op_stack_top - 1] == '#') {
-      result = vaddr_read(num_stack[num_stack_top - 1], 4);
-    } else {
+      Assert(num_stack[num_stack_top-1]!=0, "Attempted to dereference a null pointer.");
+      result = vaddr_read(num_stack[--num_stack_top], 4);
+      op_stack_top--;
+    } else if(op_stack_top>0&&num_stack_top>1){
       word_t a = num_stack[--num_stack_top];
       word_t b = num_stack[--num_stack_top];
       result = calculate(op_stack[--op_stack_top], b, a);
@@ -323,6 +330,6 @@ word_t expr(char *e, bool *success) {
     clear_tokens();
     return 0;
   }
-  
+
   return tokens_calculation(success);
 }

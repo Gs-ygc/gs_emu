@@ -21,7 +21,8 @@
 #define PMEM_LEFT  ((paddr_t)CONFIG_MBASE)
 #define PMEM_RIGHT ((paddr_t)CONFIG_MBASE + CONFIG_MSIZE - 1)
 #define RESET_VECTOR (PMEM_LEFT + CONFIG_PC_RESET_OFFSET)
-
+#define PMEM_KERNEL (PMEM_LEFT+CONFIG_PC_RESET_OFFSET+0x00200000)
+#define PMEM_DTB (PMEM_RIGHT+1-1024*1024*20) //20MB dtb (+1 对齐)
 /* convert the guest physical address in the guest program to host virtual address in NEMU */
 uint8_t* guest_to_host(paddr_t paddr);
 /* convert the host virtual address in NEMU to guest physical address in the guest program */

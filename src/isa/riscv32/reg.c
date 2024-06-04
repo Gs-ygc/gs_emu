@@ -15,19 +15,44 @@
 
 #include <isa.h>
 #include "local-include/reg.h"
+#include "common.h"
+#include "local-include/csr.h"
 
 const char *regs[] = {
   "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
   "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
   "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
-  "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
+  "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+};
+
+const word_t csr_idx_map[]={ CSR_IDX_MAP_DEFINE_LIST };
+
+const char *csregs[] = {
+  "mvendorid","mhartid","mstatus", "mip","mie","mcause","mtvec",
+  "mtval","mepc","mscratch", "misa","marchid","mimpid","pmpaddr0","pmpaddr1",
+  "pmpcfg0","tselect","tdata1","tdata2","tdata3","tinfo", "dcsr",
+  "dpc","dscratch0",
+  #ifdef CONFIG_RVPrivMSU
+  "medeleg","mideleg","mcounteren","sstatus","sie","stvec","scounteren",\
+  "senvcfg","sscratch","sepc",\
+  "scause","stval","sip","satp",
+  #endif
+  "Nan",
 };
 
 void isa_reg_display() {
   int len=ARRLEN(regs);
-  printf("%-4s    0x%08lx    %010ld\n", "pc", cpu.pc, cpu.pc);
+
+  printf("%-4s    "FMT_WORD"    %010d\n", "pc", cpu.pc, cpu.pc);
+
   for (int i=0; i<len; i++) {
-  printf("%-4s    0x%08lx    %010ld\n", reg_name(i), cpu.gpr[i], cpu.gpr[i]);
+    printf("%-4s    "FMT_WORD"    %010d\n", reg_name(i), cpu.gpr[i], cpu.gpr[i]);
+  }
+
+  len = ARRLEN(csregs)-1;
+
+  for (int i=0; i<len; i++) {
+    printf("%-10s    "FMT_WORD"    %012d\n", csregs[i], cpu.csr[i], cpu.csr[i]);
   }
 }
 
